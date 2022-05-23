@@ -1,0 +1,63 @@
+name: Push to ecr  repo
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  ecr_repo_create:
+    name: repo create
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials from Test account
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+           role-to-assume: arn:aws:iam::623470070525:role/k8role
+           aws-region: us-east-1
+           
+      - name: creating repo
+        run: |
+            aws ecr create-repository --repository-name demo_python_app --image-scanning-configuration scanOnPush=true --region us-east-1
+            aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 321089933200.dkr.ecr.us-east-1.amazonaws.com/demo_python_app
+            cd app
+            docker build --tag demo_python_app .
+            docker tag demo_python_app:latest 321089933200.dkr.ecr.us-east-1.amazonaws.com/demo_python_app:latest
+            docker push 321089933200.dkr.ecr.us-east-1.amazonaws.com/demo_python_app:latest
+
+  scan-images:
+    needs: [ecr_repo_create]
+    if: always() && (needs.ecr_repo_create.result == 'success')
+    name: scan ecr
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+    - name: Get Aws credentials
+      uses: actions/checkout@v2
+    - name: Configure AWS credentials from Test account
+      uses: aws-actions/configure-aws-credentials@v1
+      with:
+        role-to-assume: arn:aws:iam::321089933200:role/testrone
+        aws-region: us-east-1
+
+    - name: setup python
+      uses: actions/setup-python@v2
+      with:
+       python-version: 3.8 #install the python needed
+    - name: execute py script
+      working-directory: ./app
+      run: |
+          python -m pip install --upgrade pip
+          pip3 install boto3
+          python3 scan.py
+
+           
+        
