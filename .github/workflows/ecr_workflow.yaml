@@ -3,7 +3,7 @@ name: Push to ecr  repo
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   ecr_repo_create:
